@@ -1,0 +1,5 @@
+mode: ContinuousDelivery
+tag-prefix: project-b_
+branches:
+  main:
+    increment: Minor
