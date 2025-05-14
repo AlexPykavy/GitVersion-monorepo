@@ -1,0 +1,61 @@
+name: Release Project A
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/project-a/**
+
+permissions:
+  contents: write
+
+jobs:
+  Release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/project-a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v3.2.1
+        with:
+          versionSpec: '6.3.x'
+
+      - name: Determine Version
+        id: version_step # step id used as a reference for output values
+        uses: gittools/actions/gitversion/execute@v3.2.1
+        with:
+          useConfigFile: true
+          configFilePath: ./src/project-a/GitVersion.yml
+
+      - run: |
+          set -e
+
+          tagPrefix=$(grep "tag-prefix:" GitVersion.yml | awk '{ sub("\r$", "", $2); print $2 }')
+          if echo "$tagPrefix" | grep -Evq "^(\w|-)*/?$"; then
+            echo 'Invalid "tag-prefix" specified in the "GitVersion.yml" config file.'\
+              'Only alphanumeric, underscore, hyphen and optional trailing slash characters are allowed.'
+
+            exit 1
+          fi
+
+          echo "TAG_PREFIX=$tagPrefix" >> $GITHUB_ENV
+        name: Determine Tag Prefix
+
+      - run: |
+          echo Building ${{ env.GitVersion_MajorMinorPatch }} version of the project-a
+
+      - name: Create tag
+        uses: actions/github-script@v5
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ env.TAG_PREFIX }}${{ env.GitVersion_MajorMinorPatch }}',
+              sha: context.sha
+            })
